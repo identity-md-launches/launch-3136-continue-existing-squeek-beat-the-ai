@@ -164,9 +164,10 @@ export default function App() {
   const practiceHistory = practiceEntries.flatMap((e) =>
     e.result ? [e.result.settlement] : [],
   );
+  const liveSettlements = confirmedSettlements(feed.settlements, feed.status);
   const ai =
     locked?.ai ??
-    predict(mode === "practice" ? practiceHistory : feed.settlements, now);
+    predict(mode === "practice" ? practiceHistory : liveSettlements, now);
   const historyReady =
     !!feed.history &&
     feed.historyComplete &&
@@ -216,7 +217,7 @@ export default function App() {
   const latest =
     mode === "practice"
       ? [...practiceHistory].reverse()
-      : [...feed.settlements].reverse();
+      : [...liveSettlements].reverse();
 
   useEffect(() => {
     setCall(null);
@@ -599,35 +600,6 @@ export default function App() {
           </div>
         )}
 
-        {view === "play" &&
-          mode === "live" &&
-          (feed.statusError || feed.historyError || feed.eventsError) && (
-            <div className="feed-notice" role="alert">
-              <Radio size={18} />
-              <div>
-                <strong>
-                  {feed.statusError
-                    ? "Can’t reach the wheel feed"
-                    : "Settlement history is unavailable"}
-                </strong>
-                <p>
-                  {feed.statusError ?? feed.historyError ?? feed.eventsError}{" "}
-                  {feed.retryAt > now
-                    ? `Next attempt no earlier than ${utc(feed.retryAt)} UTC.`
-                    : "It retries by itself with a gradual backoff."}{" "}
-                  Saved predictions wait for a confirmed settlement. Practice
-                  works offline.
-                </p>
-              </div>
-              <button
-                className="secondary-button"
-                onClick={retry}
-                disabled={feed.retryAt > now}
-              >
-                <RotateCw size={16} /> Retry now
-              </button>
-            </div>
-          )}
         {view === "play" && (
           <>
             <div className="arena-layout">
@@ -886,6 +858,34 @@ export default function App() {
                     <p className="form-message" role="status">
                       {message}
                     </p>
+                    {mode === "live" &&
+                      (feed.statusError || feed.historyError || feed.eventsError) && (
+                        <div className="feed-notice" role="alert">
+                          <Radio size={18} />
+                          <div>
+                            <strong>
+                              {feed.statusError
+                                ? "Can’t reach the wheel feed"
+                                : "Settlement history is unavailable"}
+                            </strong>
+                            <p>
+                              {feed.statusError ?? feed.historyError ?? feed.eventsError}{" "}
+                              {feed.retryAt > now
+                                ? `Next attempt no earlier than ${utc(feed.retryAt)} UTC.`
+                                : "It retries by itself with a gradual backoff."}{" "}
+                              Saved predictions wait for a confirmed settlement. Practice
+                              works offline.
+                            </p>
+                          </div>
+                          <button
+                            className="secondary-button"
+                            onClick={retry}
+                            disabled={feed.retryAt > now}
+                          >
+                            <RotateCw size={16} /> Retry now
+                          </button>
+                        </div>
+                      )}
                     {shareLink && (
                       <label className="share-field">
                         Copy your duel link
@@ -1073,7 +1073,7 @@ export default function App() {
                 </div>
               </aside>
             </div>
-            {mode === "live" && <SettlementLedger status={feed.status} settlements={confirmedSettlements(feed.settlements, feed.status)} />}
+            {mode === "live" && <SettlementLedger status={feed.status} settlements={liveSettlements} />}
             <ActivityStrip
               buckets={feed.history?.buckets ?? []}
               offline={!!feed.historyError || now - feed.historyAt > 120_000}

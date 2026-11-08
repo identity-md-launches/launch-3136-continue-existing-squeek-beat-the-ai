@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import axe from "axe-core";
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { readFile, readdir, mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { resolve, extname } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -35,7 +35,10 @@ const mime = {
 const HOSTED_CSP =
   "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; font-src 'self' data: https:; media-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src https:; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 const server = createServer(async (req, res) => {
-  const pathname = decodeURIComponent(new URL(req.url, "http://test").pathname);
+  const requested = decodeURIComponent(new URL(req.url, "http://test").pathname);
+  const pathname = requested.startsWith("/preview/")
+    ? requested.slice("/preview".length)
+    : requested;
   const file = resolve(root, pathname === "/" ? "index.html" : `.${pathname}`);
   if (!file.startsWith(`${root}/`)) {
     res.writeHead(403).end();
@@ -112,6 +115,18 @@ function mockedData(now, settled = false, stale = false) {
   status.builder.anchor.confirmedAt = settled
     ? "2026-11-08T12:10:36.000Z"
     : "2026-11-08T12:00:36.000Z";
+  // Keep the fixture's last submission at its synthetic confirmed frontier.
+  // Retaining the downloaded #607 submission while moving the anchor to #100
+  // correctly closes #101, so it cannot represent an open-round test feed.
+  const submission = status.settlementQueue.latestSubmission;
+  submission.previousSettledThroughRound = settled ? "100" : "99";
+  submission.settledThroughRound = status.builder.anchor.settledThroughRound;
+  submission.confirmedAt = status.builder.anchor.confirmedAt;
+  submission.terminalAt = submission.confirmedAt;
+  submission.changedAt = submission.confirmedAt;
+  submission.createdAt = submission.submittedAt = new Date(
+    Date.parse(submission.confirmedAt) - 8_000,
+  ).toISOString();
   status.oracle.state = "accepted";
   status.oracle.latestClosure = {
     firstRound: settled ? "101" : "100",
@@ -206,6 +221,64 @@ const errors = [];
 let browser;
 try {
   browser = await chromium.launch({ headless: true });
+  // Exercise the emitted module in a browser, not just the source in Node: Vite
+  // and Node expose Ajv's CommonJS string-length helper differently.
+  const schemaChunk = (await readdir(resolve(root, "assets"))).find(
+    (name) => name.startsWith("api-schemas-") && name.endsWith(".js"),
+  );
+  assert.ok(schemaChunk, "Built validator chunk must exist");
+  for (const width of [390, 1440]) {
+    const bundledCtx = await browser.newContext({
+      viewport: { width, height: width === 390 ? 844 : 900 },
+      reducedMotion: "reduce",
+    });
+    const control = { now: base, requests: [] };
+    await mockFeed(bundledCtx, control);
+    const bundled = await bundledCtx.newPage();
+    const runtimeErrors = [];
+    bundled.on("pageerror", (e) => runtimeErrors.push(e.message));
+    bundled.on("console", (msg) => {
+      if (msg.type() === "error") runtimeErrors.push(msg.text());
+    });
+    bundled.on("requestfailed", (req) => runtimeErrors.push(req.url()));
+    await bundled.clock.install({ time: base });
+    await bundled.goto(`${origin}/preview/index.html?v=20261108`);
+    const results = await bundled.evaluate(async ({ url, data }) => {
+      const module = await import(url);
+      const validators = Object.values(module).find(
+        (value) => value && typeof value.status === "function",
+      );
+      if (!validators) throw new Error("Missing production validators");
+      return Object.fromEntries(["status", "history", "events"].map((kind) => [
+        kind,
+        {
+          valid: validators[kind](data[kind]),
+          unknownVersion: validators[kind]({ ...data[kind], schemaVersion: 99 }),
+        },
+      ]));
+    }, {
+      url: `${origin}/preview/assets/${schemaChunk}`,
+      data: mockedData(base),
+    });
+    for (const [kind, result] of Object.entries(results)) {
+      assert.equal(result.valid, true, `Bundled ${kind} accepts a valid response`);
+      assert.equal(result.unknownVersion, false, `Bundled ${kind} rejects an unknown version`);
+    }
+    await bundled.getByRole("button", { name: "Lock my prediction", exact: true }).waitFor();
+    assert.ok(await bundled.getByRole("button", { name: "Lock my prediction", exact: true }).isEnabled());
+    assert.ok(await bundled.getByText("LIVE", { exact: true }).isVisible());
+    assert.equal(await bundled.locator(".wheel-readings strong").first().textContent(), "42.0");
+    assert.ok((await bundled.locator(".round-number").textContent()).includes("#101"));
+    assert.equal(await bundled.locator(".feed-notice").count(), 0);
+    assert.ok(await bundled.locator(".professor-reason").isVisible());
+    const bounds = await bundled.locator(".prediction-column .primary-button").boundingBox();
+    assert.ok(bounds.y + bounds.height <= (width === 390 ? 844 : 900));
+    assert.ok(await bundled.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await bundled.screenshot({ path: `${scratch}/bundled-live-${width}.png` });
+    assert.deepEqual(runtimeErrors, [], "No production console or resource errors");
+    report(`bundled validators and clean live board at ${width}`, "Valid status/history/events accepted; unknown versions rejected; subpath index.html/query entry renders LIVE with an enabled first-screen prediction and no console/resource errors.");
+    await bundledCtx.close();
+  }
   const offline = { now: base, offline: true, requests: [] };
   const ctx = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -230,9 +303,13 @@ try {
     box.y + box.height <= 844,
     `Primary action bottom ${box.y + box.height}`,
   );
+  const recoveryBox = await page.getByRole("button", { name: "Play practice", exact: true }).boundingBox();
+  assert.ok(recoveryBox.y + recoveryBox.height <= 844, "Practice recovery is on the first phone screen");
+  assert.ok(await page.getByRole("button", { name: "Retry now", exact: true }).isVisible());
+  await page.screenshot({ path: `${scratch}/offline-390.png` });
   report(
     "offline honesty and phone first screen",
-    "No sleeping/live hamster, unknown metrics, disabled live call; primary control visible at 390×844.",
+    `No sleeping/live hamster, unknown metrics, disabled live call; primary action bottom ${box.y + box.height}, practice recovery bottom ${recoveryBox.y + recoveryBox.height} within 390×844.`,
   );
   await page.getByRole("button", { name: "Practice", exact: true }).click();
   await page.getByRole("button", { name: "Nap Zero work" }).click();
@@ -389,9 +466,31 @@ try {
     "Schema-valid mocked feed; live call locks; a second browser accepts encoded same-round friend call; no early reveal.",
   );
   control.now = base + 360_000;
-  control.settled = true;
+  control.transform = (data) => {
+    const confirmed = mockedData(control.now, true);
+    const submission = clone(confirmed.status.settlementQueue.latestSubmission);
+    submission.lifecycle = "submitted";
+    submission.confirmedAt = submission.terminalAt = null;
+    submission.changedAt = submission.submittedAt;
+    data.status.settlementQueue.latestSubmission = submission;
+    data.status.oracle.latestClosure = confirmed.status.oracle.latestClosure;
+    // Even a supplied covering event cannot outrun the confirmed status anchor.
+    data.events.events.unshift(confirmed.events.events[0]);
+  };
   await friend.clock.fastForward(180_000);
   await live.clock.fastForward(180_000);
+  await friend.locator(".ledger-pending").getByText("Round #101", { exact: true }).waitFor();
+  assert.ok((await friend.locator(".ledger-confirmed .ledger-lead").textContent()).includes("#100"));
+  assert.equal(await friend.getByRole("dialog").count(), 0);
+  assert.equal(await friend.getByRole("button", { name: "View artwork for round 101", exact: true }).count(), 0);
+  assert.ok(await friend.evaluate(() => JSON.parse(localStorage.getItem("squeek.predictor.v1")).entries.every((e) => !e.result)));
+  await friend.screenshot({ path: `${scratch}/submitted-pending-390.png`, fullPage: true });
+  report("submitted is pending", "Submitted #101 and its covering event remain separate from confirmed-through #100: no points, result dialog, or round artwork before confirmation.");
+  control.transform = null;
+  control.now = base + 480_000;
+  control.settled = true;
+  await friend.clock.fastForward(120_000);
+  await live.clock.fastForward(120_000);
   await friend.getByRole("dialog", { name: "He chose to sprint." }).waitFor();
   assert.ok(await friend.getByText(/Friend duel: You win/).isVisible());
   const friendSave = await friend.evaluate(() =>
@@ -608,6 +707,51 @@ try {
     "responsive and motion",
     "Play, collection and achievements have no overflow at 320/390/1440; reduced motion stops loops; pause and keyboard focus work.",
   );
+
+  const noJsCtx = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    javaScriptEnabled: false,
+  });
+  const noJs = await noJsCtx.newPage();
+  await noJs.goto(`${origin}/preview/`);
+  assert.equal(await noJs.locator("#root").isVisible(), false);
+  const explanation = await noJs.locator("noscript .boot p").boundingBox();
+  const reload = await noJs.getByRole("link", { name: "Reload the game" }).boundingBox();
+  assert.ok(explanation.y >= 0 && explanation.y + explanation.height <= 844);
+  assert.ok(reload.y >= 0 && reload.y + reload.height <= 844);
+  await noJs.screenshot({ path: `${scratch}/no-javascript-390.png` });
+  await noJsCtx.close();
+  report("JavaScript disabled", "The explanation and reload link appear immediately on the first 390×844 screen; the loading root is hidden.");
+
+  const bootCtx = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    reducedMotion: "reduce",
+  });
+  const bootControl = { now: base, offline: true, requests: [] };
+  await mockFeed(bootCtx, bootControl);
+  await bootCtx.route("**/assets/index-*.js", (route) => route.abort("failed"));
+  const bootPage = await bootCtx.newPage();
+  await bootPage.clock.install({ time: base });
+  await bootPage.goto(`${origin}/preview/`);
+  assert.ok(await bootPage.getByText("Waking the hamster and loading the game…").isVisible());
+  assert.equal(await bootPage.evaluate(() => document.getAnimations().filter(
+    (a) => a.playState === "running" && a.effect.getTiming().iterations === Infinity,
+  ).length), 0);
+  await bootPage.screenshot({ path: `${scratch}/boot-reduced-motion-390.png` });
+  await bootPage.clock.fastForward(20_001);
+  await bootPage.getByRole("heading", { name: "The game didn’t start" }).waitFor();
+  const bootRetry = await bootPage.getByRole("button", { name: "Try again", exact: true }).boundingBox();
+  assert.ok(bootRetry.y + bootRetry.height <= 844);
+  await bootPage.screenshot({ path: `${scratch}/boot-error-390.png` });
+  await bootCtx.unroute("**/assets/index-*.js");
+  await bootPage.getByRole("button", { name: "Try again", exact: true }).click();
+  await bootPage.getByText("OFFLINE", { exact: true }).waitFor();
+  bootControl.offline = false;
+  await bootPage.getByRole("button", { name: "Retry now", exact: true }).click();
+  await bootPage.getByRole("button", { name: "Lock my prediction", exact: true }).waitFor();
+  assert.ok(await bootPage.getByText("LIVE", { exact: true }).isVisible());
+  await bootCtx.close();
+  report("boot and API recovery", "Blocked entry keeps visible static loading with no reduced-motion loop, then shows a retry error after 20 virtual seconds; retry mounts the game, and feed Retry now recovers from OFFLINE to LIVE.");
   assert.deepEqual(errors, []);
   report(
     "browser runtime",

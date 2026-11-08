@@ -63,6 +63,10 @@ Spacing follows an 8px base rhythm with 4px refinements: 8–12px within control
 
 Phone layouts were inspected at 320px and 390px, desktop at 1440px. Their tested Play, Collection and Achievements views had no horizontal overflow. Practice and live main actions were measured within the 390 × 844 first screen. Native dialogs fit within `calc(100% - 24px)` on mobile and scroll internally when needed. Real device Safari, RTL mirroring and OS text-resize modes remain unverified.
 
+Feed errors stay inside `.prediction-column`, after the lock hint and form message. The arena and its disabled action remain above the error explanation on phones; the adjacent **Play practice** recovery also fits the first 390 × 844 screen. The unchanged diagnostic text and **Retry now** remain available below those controls.
+
+The **Confirmed vs pending** ledger is an open section with a 30px top margin, no fill, no padding and no rounded outer frame. Its two labelled `.ledger-card` columns use `--surface`, a 1px `--line` border, 12px radius and 16px padding. The grid has a 16px gap and stacks at 720px. Confirmed and pending states remain separate without nesting two cards inside another card.
+
 ## Elevation & Depth
 
 The arena uses one structural 1px border and an 18px radius; the score panel uses a contrasting paper fill without a border/shadow combination. The artwork grid is open, not a nested set of boxed cards. Shadows are reserved for the transient achievement toast. Native dialogs use a dark translucent backdrop with 3px blur and the browser’s top layer; they are not manually stacked popovers.
@@ -88,14 +92,20 @@ Outer arena/scoreboard radii are 18px on desktop and 14px on phones. Artwork and
 | Achievement cards/toast | `src/App.tsx` | Nine local achievements; permanent unlocked state; polite announcement and manual dismiss |
 | `ResultReveal` | `src/App.tsx` | Native labelled dialog; visible point breakdown, outcome and streak; Escape/backdrop/close paths; focus restoration |
 | About | `src/App.tsx` | Short sections explaining play, limits, points and required community attribution; normal document navigation |
+| Feed recovery | `src/App.tsx`, `.feed-notice` | Adjacent alert after prediction controls; automatic backoff, Retry now and first-screen Practice recovery |
+| Boot/loading/error | `index.html`, `src/main.tsx` | Inline styles and static loading text precede the bundle; 20-second guard and render boundary show Try again; JavaScript-disabled visitors immediately see the explanation and reload link |
 
 Buttons and links have explicit names; icon-only controls have `aria-label`. Every keyboard focus ring is 3px in `--focus`, with sufficient offset. Native buttons supply Enter/Space behaviour and native dialogs supply background inertness and focus containment. Focus returns to the trigger when it still exists, otherwise to the main landmark. A skip link is the first focusable item.
 
 The live lock state waits for matching status, history and event installation IDs as well as freshness and closure guards. A feed transition keeps the action unavailable rather than presenting history from a different installation as the current game.
 
+Professor inputs, live artwork, the confirmed ledger and scoring all use the existing `confirmedSettlements` frontier filter. A submitted round remains pending even if its covering event arrives ahead of the confirmed status anchor. This preserves the existing AI formula and point rules.
+
+The static boot screen uses a system sans-serif stack, 28px heading and 16px body, with the established paper, ink and orange colors, so it remains legible before application CSS or fonts load. With JavaScript disabled, a `noscript` style hides `#root`; the explanation is the first viewport. Reduced motion sets `.boot-wheel` to `animation: none`, retaining the static wheel and loading text. A finite delayed hint reveals the reload link after 12 seconds.
+
 The pending-call evidence backfill in `src/api.ts` and `src/useFeed.ts` now reaches saved live calls older than seven days. While a multi-poll scan is incomplete, the existing Professor loading state remains visible and the live action waits for history. A failed page uses the existing adjacent feed error; it never turns a pending call into a result. Confirmed recovered calls use the same result dialog, streak breakdown, scoreboard and art collection as current calls. The eight-day return and cursor-error recovery were checked at 390px; the visual tokens and layout above are preserved.
 
-Animations exist only under `prefers-reduced-motion: no-preference`. The wheel rotates continuously from the reported RPM, with a minimum 0.2-second period to prevent extreme speed. Running bounce is 0.24s, sleep breathing is 3s, result reveal is 0.5s, and control colour transitions are 120ms. Reduced motion disables those loops; a visible pause control additionally pauses scene animation. There are no autoplay sounds, flashes, page-load entrances or `transition: all` rules.
+Game animations exist only under `prefers-reduced-motion: no-preference`. The wheel rotates continuously from the reported RPM, with a minimum 0.2-second period to prevent extreme speed. Running bounce is 0.24s, sleep breathing is 3s, result reveal is 0.5s, and control colour transitions are 120ms. Reduced motion disables those loops; a visible pause control additionally pauses scene animation. There are no autoplay sounds, flashes, game page-load entrances or `transition: all` rules.
 
 ## Do’s and Don’ts
 

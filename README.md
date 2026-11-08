@@ -106,7 +106,7 @@ If a confirmed settlement covers multiple rounds, predictions for those rounds r
 
 ## Install, run, preview and rebuild
 
-Requires Node.js 22 and npm. All runtime assets, fonts and schemas are local; only public feed reads need the network after deployment.
+Requires Node.js 22 or newer and npm. All runtime assets, fonts and schemas are local; only public feed reads need the network after deployment.
 
 ```sh
 npm ci
@@ -119,23 +119,27 @@ npm run preview
 
 Open the local URL printed by Vite. `dev` and `preview` bind to localhost. Production files are already included in **`dist/`**; rebuilding replaces them. Vite’s `base: './'`, relative asset URLs, one HTML entry and hash-based duel links support IPFS gateway subpaths without server rewrites. Serve through HTTP(S), not `file://`. No secrets or environment file is needed.
 
+`npm run build` regenerates standalone JSON Schema validators before bundling. The hosted CSP forbids runtime `eval`/`new Function`. The generator normalizes Ajv’s CommonJS string-length helper to one callable binding for both Node and Vite; do not reintroduce a second `.default` access. The browser suite tests the actual emitted validator chunk, since passing source tests alone did not catch that interop failure. All official schemas remain bundled; Vite reports a size advisory for that chunk.
+
+The inline boot screen appears before JavaScript loads. A blocked or broken bundle reaches a retry screen after 20 seconds; disabled JavaScript immediately shows its own explanation. Feed failures keep the game controls visible, with Practice and Retry now recovery. Reduced motion stops the boot spinner entirely.
+
 `npm test` runs the Node test runner through the TypeScript loader. It is network independent. Optional browser interaction/accessibility tests use a caller-provided Playwright module and installed Chromium:
 
 ```sh
-IMD_PLAYWRIGHT=/opt/imd-tools/playwright-mcp/node_modules/playwright/index.mjs PLAYWRIGHT_BROWSERS_PATH=/opt/imd-tools/ms-playwright npm run test:browser
+IMD_PLAYWRIGHT=/path/to/playwright/index.mjs PLAYWRIGHT_BROWSERS_PATH=/path/to/installed/browsers npm run test:browser
 ```
 
 Outside IMD, set `IMD_PLAYWRIGHT` to your own Playwright `index.mjs` and `PLAYWRIGHT_BROWSERS_PATH` to your installed browser directory. The suite serves the built export, blocks real feed access with explicit test fixtures, and uses a virtual clock; it does not wait ten real minutes. It writes only under `test/scratch/`, which is not a build input or submitted deliverable.
 
 ## Validation
 
-Actual checks, fixed findings and limitations are recorded in [VALIDATION.md](VALIDATION.md). The production build and TypeScript check pass, along with all 61 unit tests. Unit tests cover AI determinism/formula, scoring and streaks, NAP/small/large settlement resolution, open-round arithmetic, closure/queue guards, stale/offline/simulated handling, Retry-After, schema/network rejection, duels, achievements, art seeds and counter resets. Regression tests cover eight-day-old pending calls, pagination past the training cutoff and cached overlap, retained evidence, scans beyond 40 pages and failed-page resumption. Chromium interaction tests cover the complete practice game, persistence, collection/downloads, two-browser live duels with mocked confirmed settlements, an eight-day return with old/new call resolution and cursor invalidation recovery, unknown schemas, and 320/390/1440 layouts. Axe audits reported zero violations in the tested board and result states. Safari remains unverified because WebKit was unavailable.
+Actual checks, fixed findings and limitations are recorded in [VALIDATION.md](VALIDATION.md). The production build and TypeScript check pass, along with all 68 unit tests. Unit tests cover AI determinism/formula, scoring and streaks, NAP/small/large settlement resolution, open-round arithmetic, closure/queue guards, stale/offline/simulated handling, Retry-After, schema/network rejection, duels, achievements, art seeds and counter resets. Regression tests cover eight-day-old pending calls, pagination past the training cutoff and cached overlap, retained evidence, scans beyond 40 pages and failed-page resumption. Chromium interaction tests cover the emitted validators under the hosted CSP at a static subpath, complete practice game, persistence, collection/downloads, two-browser live duels, submitted-versus-confirmed settlement, an eight-day return with cursor invalidation recovery, unknown schemas, and 320/390/1440 layouts. Boot tests cover JavaScript disabled, blocked entry, reduced motion, timeout, reload and feed retry. Axe audits reported zero violations in the tested board and result states. Safari remains unverified because WebKit was unavailable.
 
 An additional check fetched and schema-validated the actual public endpoints, including a complete seven-day event scan with naps. A Chromium inspection forwarded those real public HTTPS response bodies unchanged through the test runner and showed a timestamped LIVE wheel, real Professor inputs and real settlement art with no uncaught JavaScript errors. Mocked-feed interaction tests are not claimed as observed real-world duel outcomes.
 
 ## Hosting and public source handoff
 
-The complete source, package manifest, lockfile, local runtime assets and finished static export are included. IMD’s delivery plane publishes the submitted `dist/` to IPFS/IMD after review; the worker does not run a separate publishing command. Hosting and the public repository URL are post-review handoffs, not fabricated URLs in this tree. No independently created public GitHub repository or live deployment URL is claimed here. Publish the full source and `dist/` together to the allocated public GitHub repository, preserving attribution.
+This revision continues completed job `3f8539ac-d327-494f-9f07-acf232e54e08`, the existing [repository](https://github.com/identity-md-launches/launch-3134-build-publish-squeek-beat-the-ai) and [site](https://squeek-beat-the-ai-predictor.imd.site/). The complete source, unchanged package manifest/lockfile, local runtime assets and rebuilt static export are included. IMD’s delivery plane publishes the submitted `dist/` to the **same site and domain** after review; the worker does not run a separate publishing command. No new project or domain was created. The final uploaded domain cannot be checked until that handoff completes.
 
 ## Genesis /code verification
 
@@ -148,7 +152,7 @@ Verification is a project-owner step after the final site and public GitHub repo
 5. Add the **exact repository verification line issued by Genesis** to this README in the project’s **public GitHub repository**. The community-project sentence above is attribution, not a replacement for that owner-specific verification line.
 6. Return to Genesis /code and press **Verify**. Keep the TXT record, page tag and README line in place for rechecks. A successful ownership check is not a claim of Genesis approval; team approval is separate.
 
-The domain, owner-issued verification strings and final repository URL were not supplied for this build. None were guessed or installed as stand-ins. The source is ready for the owner to add the issued values after the publishing handoff.
+Owner-issued Genesis verification strings were not supplied. None were guessed or installed as stand-ins. They are separate from this repair of the existing site and repository; no Genesis verification or badge approval is promised.
 
 ## Source map, privacy and submission budget
 

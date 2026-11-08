@@ -2546,9 +2546,9 @@ dialog::backdrop {
 /* Settlement ledger: confirmed and pending rounds are shown apart. */
 .ledger-section {
   margin-top: 30px;
-  padding: 22px 24px;
-  background: #f0eee7;
-  border-radius: 13px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
 }
 .ledger-grid {
   display: grid;
@@ -2612,9 +2612,6 @@ dialog::backdrop {
   flex-shrink: 0;
 }
 @media (max-width: 720px) {
-  .ledger-section {
-    padding: 18px 16px;
-  }
   .ledger-grid {
     grid-template-columns: minmax(0, 1fr);
   }

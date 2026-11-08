@@ -49,7 +49,7 @@
       .boot small { color: #686258; font-size: 12px; max-width: 46ch; overflow-wrap: anywhere; }
       @keyframes boot-spin { to { transform: rotate(360deg); } }
       @keyframes boot-show { to { opacity: 1; } }
-      @media (prefers-reduced-motion: reduce) { .boot-wheel { animation-duration: 3s; } }
+      @media (prefers-reduced-motion: reduce) { .boot-wheel { animation: none; } }
     </style>
   </head>
   <body>
@@ -65,8 +65,11 @@
       </div>
     </div>
     <noscript>
+      <style>#root { display: none; }</style>
       <div class="boot">
+        <h1>Squeek Beat-the-AI Predictor</h1>
         <p>This game needs JavaScript. Turn it on and reload to play.</p>
+        <a href="./index.html">Reload the game</a>
       </div>
     </noscript>
     <script>

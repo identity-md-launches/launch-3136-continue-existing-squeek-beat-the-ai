@@ -1,6 +1,65 @@
 # Validation record
 
-Checked on 2026-11-08 against the built static export. These are worker-run checks, not an independent certification or Genesis approval. No deployment or public repository URL is claimed before the IMD publishing handoff.
+Checked on 2026-11-08 against the built static export. These are worker-run checks, not an independent certification or Genesis approval. The current revision below supersedes earlier results; older build records are preserved as history. Publication to the existing domain is an IMD handoff after submission.
+
+## Current revision: production validators and recovery
+
+All five reported findings reproduced against the supplied `dist/` before edits. The page was served with the exact hosted CSP (no `unsafe-eval`), empty browser storage/cache and a virtual clock at `2026-11-08T12:05:00Z`.
+
+| Finding / source | Reproduction, fix and recheck |
+| --- | --- |
+| High: production validator interop, `scripts/build-validators.mjs:29` | All four API requests returned 200, but each emitted status/history/events validator threw **“xe is not a function”** at 390 and 1440. Source tests still passed 68/68. The generator now replaces the entire generated string-length `.default` reference with one callable binding, unwrapping Node's nested defaults until callable. Local ESM formats are imported as a namespace. Regenerated validators and final bundle accept all three valid fixtures and reject unknown versions in Chromium; LIVE and enabled prediction appear without console/resource errors. |
+| High: offline first screen, `src/App.tsx:861` | The disabled prediction bottom was **964.859375px** at 390×844. Moved the existing alert below the lock hint/form status in the prediction column. Final prediction bottom: **753.859375px**; Play practice recovery: **805.859375px**. Explanation and Retry now remain available below. |
+| Medium: disabled JavaScript, `index.html:67` | The noscript panel began at y=844. Its inline style now hides the loading root; the explanation and reload link are immediately visible in the first viewport. |
+| Low: reduced-motion boot, `index.html:52` | Blocked entry plus reduced motion left an infinite 3000ms spinner running. `animation: none` now leaves a static wheel and loading text. The browser finds zero running infinite animations, then verifies timeout and retry. |
+| Low: nested ledger cards, `src/style.css:2547` | Initial taste@1: 15/16, with two nested cards. Removed only the outer fill, padding and radius, including its mobile padding override. Final taste@1: **16/16**, zero nested cards. |
+
+An additional submitted-state browser regression exposed artwork appearing ahead of the confirmed status anchor. `src/App.tsx:167` now applies the existing `confirmedSettlements` filter to Professor inputs, live artwork and the ledger, consistently with scoring. No AI formula, title, bracket or point rule changed. The test supplies a covering event while #101 is only submitted and the anchor remains #100: no points, result dialog or #101 artwork appear. Confirmation then reveals +30, awards Duelist and survives reload without duplicate points. Existing unit tests explicitly cover the brief's **613 confirmed / 614 submitted at 02:12 UTC**, including rejection before confirmation and normal scoring afterward.
+
+The browser fixture also required a correction: it shifted its downloaded anchor from #607 to #100 but retained a #607 latest submission. The game correctly treated #101 as closed. The fixture now moves the confirmed submission to its synthetic anchor; no gameplay closure guard was weakened.
+
+### Actual final commands and results
+
+Dependencies were installed from the unchanged lockfile into an isolated project under `test/scratch/project/` using `npm ci --prefix test/scratch/project --cache test/scratch/npm-cache --no-audit --no-fund`. Source, config and test files were copied there; the produced validators/export were copied back. An integrity check confirmed every build input and every delivered export file matched byte for byte. No repository dependency directory or ignore rule was changed.
+
+| Command / check | Final result |
+| --- | --- |
+| `npm run build` in scratch project | Exit 0; Vite 6.4.1; complete relative export. Size advisory for the retained official-schema chunk (1,277,469 bytes, 78.33 kB gzip); no missing-export warning. |
+| `npm run typecheck` in scratch project | Exit 0, no diagnostics. |
+| `npm test` in scratch project | **68 passed, 0 failed**; includes both worked checks, first +5 and subsequent streak steps, exact bracket edges and confirmation gates. |
+| Supplied Playwright runtime: `node test/scratch/project/test/browser.mjs` from root | Exit 0 on final root `dist/`; **19 passing report groups** plus one WebKit limitation. Both 390×844 and 1440×900 fresh contexts validate emitted modules and an enabled LIVE board at `/preview/index.html?v=20261108`. Root and `/preview/` entry paths also exercised. |
+| Pinned `node .imd/reads/skills/design-critic/scripts/taste.mjs --out test/scratch/taste` with supplied Playwright runtime | Exit 0; **16/16 checks passed**; no horizontal overflow, overlap or clipped text at 320/390/1440; first phone screen has 16 prose words; zero nested cards. |
+| Axe on final tested states | Zero violations: live board **46** checks, practice board **44**, practice result **19**, recovered result **19**. |
+| Export integrity | All HTML/share-image/CSS references resolve relatively; source, lockfile, local font/art/licences remain included. No maps, dependency archives or symlinks. Final budget below. |
+
+The browser suite also completed three practice rounds for **90 points**, streak **3**, three artworks and Hat Trick, keeping live progress separate; PNG export at **1080×1080**; collection/achievements/about; two-context duel links; eight-day pending-call backfill, cursor 409 recovery and weekly/all-time totals; stale/unknown-schema handling; keyboard focus, pause/reduced motion and 320/390/1440 navigation. Boot checks abort the entry bundle, observe static loading, advance **20 virtual seconds**, verify the visible retry error, restore the bundle and reload; API Retry now then recovers OFFLINE to LIVE. There was no real-time settlement wait.
+
+Screenshots inspected from the final checks: `test/scratch/browser/bundled-live-390.png`, `bundled-live-1440.png`, `offline-390.png`, `no-javascript-390.png`, `submitted-pending-390.png`, and `test/scratch/taste/shots/390.png`. Scratch reports and screenshots are intentionally not submission assets.
+
+### Public service and handoff
+
+The final export also passed a scratch browser check with **unchanged public HTTPS bodies**, transported by curl through test-only Playwright routes. At **03:06:27.787Z** the actual status showed confirmed through **619** (03:00:36 UTC), open **620**, an enabled prediction, **0.0 RPM** matching `/v1/status`, no pending submission, four artworks and the Professor's plain-language Nap reasoning. Status v1, both history v3 responses and **855 events across nine v4 pages** were accepted; no console errors occurred. A prior successful snapshot showed #618 confirmed and #619 separately submitted. One preliminary attempt reached a feed notice; a fresh attempt completed. Service uptime is not guaranteed. No fixture, proxy, clock or response rewrite is present in production.
+
+The existing hosted entry was reachable and still referenced its previously deployed bundle. This worker prepared the updated export for submission for **the same repository/site/domain**; it did not run a publisher or create a new project. Post-handoff domain rendering and direct public browser/CORS transport were not verified. The browser connector itself could not start its configured Chrome; the installed Playwright Chromium runtime was used successfully instead. WebKit was unavailable, so Safari, real devices, human screen-reader use, native 200% zoom, RTL mirroring and animation-panel slow replay remain unverified.
+
+### Better Interface coverage
+
+| Domain | Reviewed coverage |
+| --- | --- |
+| Accessibility | Checked native names/roles, adjacent alert/retry, first-screen recovery, no-JS explanation, keyboard/Escape, reduced-motion boot and game; axe zero violations. Human assistive-technology session not performed. |
+| Layout | Checked final live, offline, practice and pending states at phone/desktop widths; 320px reflow and navigation; both first-screen actions fit. RTL and native zoom not checked. |
+| Writing | Checked preserved game voice and literal LIVE/PRACTICE/unknown/submitted/confirmed language, adjacent actionable failure text; no new badge/airdrop/wallet promise. |
+| Typography | Preserved local Outfit, existing six roles and three weights; rendered wrapping and probe passed. Boot's system-font fallback is documented. |
+| Colors | Preserved semantic tokens; probe and axe report measured rendered text meets 4.5:1 (3:1 large). Decorative canvas contrast is not claimed; dark theme not applicable. |
+| UI | Checked loading, unavailable, retry, selected, locked, submitted, confirmed, result, collection and reload; fixed outer ledger chrome and boot motion. Slow animation-panel replay not performed. |
+
+`DESIGN.md` records final implemented recovery, boot, ledger and responsive rules. All five finding IDs have `fixed` responses in `.imd-responses.json`. Complete for this revision's implementation and local validation scope, with publishing and browser limitations above.
+
+### Final revision integrity
+
+Final eligible bundle: **54 files / 4,334,425 bytes**; production export: **10 files / 1,689,081 bytes**, below the **8,388,608-byte** cap. The unchanged ignore file is **55 bytes**, within its existing 256-byte path budget. No symlink, submodule declaration, source map, dependency/cache directory or package archive is included. `dist/` remains eligible for submission.
+
+## Historical records from previous work
 
 ## Revision: pending calls older than seven days
 
